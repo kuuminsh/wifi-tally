@@ -34,6 +34,8 @@ The vMix TCP connector now buffers XML replies using the `XML <length>` protocol
 
 ## vMix Reconnection Timeout
 
+vTally automatically reconnects when vMix is restarted or temporarily closed. It retries the connection every three seconds and resets the retry window after a complete vMix TCP API handshake.
+
 If vTally cannot establish a complete vMix connection within 10 minutes, the backend exits with code `1`. The Electron tray application detects this unexpected backend exit and closes as well.
 
 ## Build Information and Windows Packaging

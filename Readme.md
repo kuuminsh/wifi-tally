@@ -37,6 +37,7 @@ This fork adds vMix-focused configuration and reliability improvements:
 * Save independent Tally assignments and per-Tally settings for each vMix project. vTally detects the active project automatically and loads its saved profile; projects without a saved profile start with unpatched Tallies.
 * See the active vMix project name, configuration status, application version, and build time in the web interface. Use **Save project** to store the active project's configuration.
 * Process vMix TCP XML responses safely when they arrive in multiple network packets.
+* Automatically reconnect to vMix after it is restarted or temporarily closed, retrying every three seconds for up to 10 minutes.
 * Exit the Hub if a complete vMix connection cannot be made within 10 minutes; the portable tray application exits with it.
 * Build standalone backend and portable Windows executables.
 
