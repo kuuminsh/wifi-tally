@@ -22,9 +22,17 @@ class MockCommunicator {
         this.previews = previews
     }
 
-    notifyChannelNames(count, names) {
-        this.channelCount = count
-        this.channelNames = names
+    notifyChannels(channels) {
+        this.channels = channels
+        this.channelCount = channels.length
+        this.channelNames = channels.reduce((names, channel) => {
+            names[channel.id] = channel.name
+            return names
+        }, {})
+    }
+
+    notifyVmixProject(presetPath) {
+        this.presetPath = presetPath
     }
 
     notifyMixerIsConnected() {
@@ -78,13 +86,13 @@ describe('VmixConnector', () => {
             const promise = new Promise((resolve, reject) => {
                 server.listen({
                     port: 0,
-                    host: 'localhost',
+                    host: '127.0.0.1',
                 }, (error) => {
                     if (error) {
                         console.error(error)
                         reject(error)
                     } else {
-                        global.vMixServerConfig.serverIp = server.address().address
+                        global.vMixServerConfig.serverIp = '127.0.0.1'
                         global.vMixServerConfig.serverPort = server.address().port
                         resolve()
                     }
@@ -166,17 +174,24 @@ describe('VmixConnector', () => {
         })
         test('recognizes XML response', async () => {
             const server = global.vMixServerConfig
+            const presetPath = 'E:\\Projects\\Show.vmix'
             server.xml = '<vmix><version>{version}</version><edition>Trial</edition><inputs><input key="0182ffa0-9fa9-4514-91af-37ef60240c87" number="1" type="Colour" title="Foobar" shortTitle="Foobar" state="Paused" position="0" duration="0" loop="False">Foobar</input><input key="a108d01e-26f4-466f-a37d-d8f91f3fd6eb" number="2" type="Colour" title="Tolle rote Farbe" shortTitle="Tolle rote Farbe" state="Paused" position="0" duration="0" loop="False">Tolle rote Farbe</input><input key="3f6e4c1b-a13f-46b0-9537-676a4fb17ea3" number="3" type="Colour" title="Colour Bars" shortTitle="Colour Bars" state="Paused" position="0" duration="0" loop="False">Colour Bars</input></inputs><overlays><overlay number="1" /><overlay number="2" /><overlay number="3" /><overlay number="4" /><overlay number="5" /><overlay number="6" /></overlays><preview>2</preview><active>3</active><fadeToBlack>False</fadeToBlack><transitions><transition number="1" effect="VerticalSlide" duration="500" /><transition number="2" effect="Merge" duration="1000" /><transition number="3" effect="Wipe" duration="1000" /><transition number="4" effect="CubeZoom" duration="1000" /></transitions><recording>False</recording><external>False</external><streaming>False</streaming><playList>False</playList><multiCorder>False</multiCorder><fullscreen>False</fullscreen><audio><master volume="100" muted="False" meterF1="0" meterF2="0" headphonesVolume="100" /></audio></vmix>'
+            server.xml = server.xml.replace('<inputs>', `<preset>${presetPath}</preset><inputs>`)
             const [vmix, communicator] = createVmixCommunicator(server.serverIp, server.serverPort)
             try {
                 vmix.connect()
                 await waitUntil(() => communicator.channelCount !== undefined).then(() => {
                     expect(communicator.channelCount).toEqual(3)
                     expect(communicator.channelNames).toEqual({1: "Foobar", 2: "Tolle rote Farbe", 3: "Colour Bars"})
+                    expect(communicator.presetPath).toEqual(presetPath)
                 })
             } finally {
                 await vmix.disconnect()
             }
+        })
+        test('stops reconnecting after 10 minutes have elapsed', () => {
+            const startedAt = Date.now() - (VmixConnector.reconnectLimit + 1)
+            expect(VmixConnector.hasReachedReconnectLimit(startedAt)).toBe(true)
         })
     })
 })

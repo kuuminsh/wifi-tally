@@ -121,7 +121,7 @@ function Tally({ tally, className }: TallyProps) {
                 <TallyMenu className={classes.tallyHeadIcon} tally={tally} />
             </></div>
             <div className={classes.tallyBody}>
-                <ChannelSelector value={tally.channelId} channels={channels} onChange={value => patchTally(tally, value)} />
+                <ChannelSelector value={tally.channelIds} channels={channels} onChange={value => patchTally(tally, value)} />
             </div>
             <div className={classes.tallyFoot + (tally.isActive() && tally.isMissing() ? " " + classes.tallyFootMissing : "")}>
                 <div className={classes.tallyFootItem}>{ tally.isActive() ? (tally.isMissing() ? "missing": "connected") : "disconnected" }</div>

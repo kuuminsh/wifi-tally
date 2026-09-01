@@ -27,6 +27,30 @@ test('Web Tally defaults', () => {
     expect(tally.configuration.getStageLightBrightness()).toBeUndefined()
 })
 
+describe('multiple channel assignments', () => {
+    test('matches any assigned channel', () => {
+        const tally = new UdpTally("Multi", ["1", "3"])
+
+        expect(tally.isIn(["2", "3"])).toBe(true)
+        expect(tally.isIn(["2", "4"])).toBe(false)
+    })
+
+    test('loads a legacy channelId as channelIds', () => {
+        const tally = Tally.fromJsonForSave({
+            name: "Legacy",
+            channelId: "42",
+        })
+
+        expect(tally.channelIds).toEqual(["42"])
+    })
+
+    test('saves all assigned channels', () => {
+        const tally = new UdpTally("Multi", ["1", "3"])
+
+        expect(tally.toJsonForSave().channelIds).toEqual(["1", "3"])
+    })
+})
+
 describe('toJsonForSave/fromJsonForSave', () => {
     test('it loads an UdpTally by default', () => {
         // old configuration to not have a "type"

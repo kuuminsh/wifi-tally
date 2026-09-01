@@ -2,6 +2,7 @@
   "name": "vtally",
   "version": "0.5.1",
   "private": true,
+  "main": "tray-main.js",
   "dependencies": {
     "atem-connection": "^3.0.0-nightly-latest-20211125-222857-2b30eea.0",
     "escape-string-regexp": "^4.0.0",
@@ -20,8 +21,10 @@
   "scripts": {
     "start:frontend": "cross-env PORT=3001 BROWSER=none react-scripts start",
     "start:backend": "ts-node --project tsconfig.server.json src/server.ts --env=development",
-    "build:frontend": "react-scripts build",
+    "build:frontend": "node scripts/write-build-info.js && react-scripts build",
     "build:backend": "tsc --project tsconfig.server.json",
+    "build:windows": "npm run build:frontend && npm run build:backend && node scripts/package-windows.js",
+    "build:tray": "npm run build:windows && electron-builder --win portable",
     "test": "react-scripts test",
     "test:ci": "CI=true react-scripts test",
     "cypress:open": "cypress open",
@@ -29,6 +32,7 @@
     "lint": "eslint ."
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
     "@material-ui/core": "^4.12.3",
     "@material-ui/icons": "^4.11.2",
     "@material-ui/lab": "^4.0.0-alpha.60",
@@ -47,17 +51,20 @@
     "@types/tmp": "^0.2.3",
     "cross-env": "^7.0.3",
     "cypress": "^6.9.1",
+    "electron": "^22.3.27",
+    "electron-builder": "^24.13.3",
     "eslint-plugin-cypress": "^2.12.1",
     "jest-extended": "^0.11.5",
     "lato-font": "^3.0.0",
     "nosleep.js": "^0.12.0",
+    "pkg": "5.8.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-full-screen": "^0.3.2-0",
     "react-router-dom": "^5.3.0",
     "react-scripts": "4.0.1",
     "ts-node": "^9.0.0",
-    "typescript": "^4.5.4",
+    "typescript": "4.4.4",
     "web-vitals": "^0.2.4"
   },
   "engines": {
@@ -73,6 +80,38 @@
     "x64",
     "arm"
   ],
+  "build": {
+    "extends": null,
+    "appId": "com.wifi-tally.vtally",
+    "productName": "vTally",
+    "npmRebuild": false,
+    "files": [
+      "tray-main.js"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/vtally.exe",
+        "to": "vtally.exe"
+      },
+      {
+        "from": "dist/frontend",
+        "to": "frontend"
+      },
+      {
+        "from": "../art/vtally-logo.svg",
+        "to": "vtally-logo.svg"
+      },
+      {
+        "from": "tray-icon.png",
+        "to": "tray-icon.png"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false
+    },
+    "forceCodeSigning": false
+  },
   "browserslist": {
     "production": [
       ">0.2%",

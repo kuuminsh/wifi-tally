@@ -17,13 +17,12 @@ test('it writes changes to configuration', () => {
     // tally was created
     expect(configuration.getTallies()).toHaveLength(1)
     expect(configuration.getTallies()[0].name).toEqual("Foobar")
-    expect(configuration.getTallies()[0].channelId).toBe(undefined)
+    expect(configuration.getTallies()[0].channelIds).toEqual([])
 
-    tally.channelId = "42"
-    container.update(tally)
+    container.patch(tally.name, "web", ["42", "84"])
     expect(configuration.getTallies()).toHaveLength(1)
     expect(configuration.getTallies()[0].name).toEqual("Foobar")
-    expect(configuration.getTallies()[0].channelId).toEqual("42")
+    expect(configuration.getTallies()[0].channelIds).toEqual(["42", "84"])
 
     container.remove(tally.name, "web")
     expect(configuration.getTallies()).toEqual([])

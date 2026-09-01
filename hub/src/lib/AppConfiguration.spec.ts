@@ -121,6 +121,17 @@ describe("toJson/fromJson", () => {
         expect(tallies[1]?.channelId).toBeFalsy()
         expect(tallies[1]?.configuration.getOperatorLightBrightness()).toEqual(90)
     })
+    test('it can persist vMix project profiles', () => {
+        const emitter = new EventEmitter()
+        const config = new AppConfiguration(emitter)
+        const tally = new UdpTally("Camera", ["8", "10"])
+        config.setVmixProjectProfile('E:\\Projects\\Show.vmix', [tally.toJsonForSave()])
+
+        const otherConfig = new AppConfiguration(emitter)
+        otherConfig.fromJson(config.toJson())
+
+        expect(otherConfig.getVmixProjectProfile('e:\\projects\\show.vmix')?.tallies[0].channelIds).toEqual(["8", "10"])
+    })
     test('it can persist channels', () => {
         const emitter = new EventEmitter()
         const config = new AppConfiguration(emitter)

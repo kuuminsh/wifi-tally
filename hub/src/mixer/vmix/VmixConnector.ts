@@ -1,5 +1,6 @@
 import net from 'net'
 import xml2js from 'xml2js'
+import Channel from '../../domain/Channel'
 import { MixerCommunicator } from '../../lib/MixerCommunicator'
 import { Connector } from '../interfaces'
 import VmixConfiguration from './VmixConfiguration'
@@ -16,6 +17,10 @@ class VmixConnector implements Connector {
     waitForHelloPeriod: number
     reconnectTimeout?: NodeJS.Timeout
     waitForHelloTimeout?: NodeJS.Timeout
+    disconnectRequested: boolean
+    reconnectStartedAt?: number
+    dataBuffer: Buffer
+    expectedXmlLength?: number
 
     constructor(configuration: VmixConfiguration, communicator: MixerCommunicator) {
         this.configuration = configuration
@@ -24,8 +29,14 @@ class VmixConnector implements Connector {
         this.wasSubcribeOkReceived = false
         this.xmlQueryInterval = 5000
         this.waitForHelloPeriod = 5000
+        this.disconnectRequested = false
+        this.dataBuffer = Buffer.alloc(0)
     }
-    connect() {
+    connect(isReconnect = false) {
+        if (!isReconnect) {
+            this.reconnectStartedAt = undefined
+        }
+        this.disconnectRequested = false
         const client = new net.Socket()
         this.client = client
 
@@ -37,13 +48,23 @@ class VmixConnector implements Connector {
         }
 
         const reconnectClient = () => {
+            if (this.reconnectStartedAt === undefined) {
+                this.reconnectStartedAt = Date.now()
+            }
+            if (VmixConnector.hasReachedReconnectLimit(this.reconnectStartedAt)) {
+                console.error("Could not reconnect to vMix within 10 minutes. Reconnect attempts stopped.")
+                process.exit(1)
+                return
+            }
             this.disconnect().then(() =>
                 this.reconnectTimeout = setTimeout(() => {
                     if (this.reconnectTimeout) {
                         clearTimeout(this.reconnectTimeout)
+                        this.reconnectTimeout = undefined
                     }
-                    client.connect(this.configuration.getPort().toNumber(), this.configuration.getIp().toString())
-                }, 200)
+                    this.disconnectRequested = false
+                    this.connect(true)
+                }, VmixConnector.reconnectInterval)
             )
         }
 
@@ -87,6 +108,9 @@ class VmixConnector implements Connector {
         client.on('data', this.onData.bind(this))
 
         client.on('close', (hadError) => {
+            if (this.client !== client && !this.disconnectRequested) {
+                return
+            }
             this.communicator.notifyMixerIsDisconnected()
             console.log("Connection to vMix closed")
 
@@ -95,19 +119,48 @@ class VmixConnector implements Connector {
                 this.intervalHandle = undefined;
             }
 
-            if (hadError) {
-                console.debug("Connection to vMix is reconnected after an error")
+            if (!this.disconnectRequested) {
+                console.debug(`Connection to vMix is reconnecting${hadError ? " after an error" : ""}`)
                 reconnectClient()
             }
         })
 
     }
     private onConnectionComplete() {
+        this.reconnectStartedAt = undefined
         console.log("Connection to vMix complete")
         this.communicator.notifyMixerIsConnected()
     }
     private onData(data: Buffer) {
-        data.toString().replace(/[\r\n]*$/, "").split("\r\n").forEach(command => {
+        this.dataBuffer = Buffer.concat([this.dataBuffer, data])
+
+        while (this.dataBuffer.length > 0) {
+            if (this.expectedXmlLength !== undefined) {
+                if (this.dataBuffer.length < this.expectedXmlLength) {
+                    return
+                }
+                const xml = this.dataBuffer.subarray(0, this.expectedXmlLength).toString()
+                this.dataBuffer = this.dataBuffer.subarray(this.expectedXmlLength)
+                this.expectedXmlLength = undefined
+                if (this.dataBuffer.subarray(0, 2).toString() === "\r\n") {
+                    this.dataBuffer = this.dataBuffer.subarray(2)
+                }
+                this.handleXmlCommand(xml)
+                continue
+            }
+
+            const endOfCommand = this.dataBuffer.indexOf("\r\n")
+            if (endOfCommand === -1) {
+                return
+            }
+            const command = this.dataBuffer.subarray(0, endOfCommand).toString()
+            this.dataBuffer = this.dataBuffer.subarray(endOfCommand + 2)
+            const xmlHeader = command.match(/^'?XML (\d+)$/)
+            if (xmlHeader) {
+                this.expectedXmlLength = Number(xmlHeader[1])
+                continue
+            }
+
             console.debug(`> ${command}`)
             if (command.startsWith("VERSION OK")) {
                 this.wasHelloReceived = true
@@ -119,14 +172,12 @@ class VmixConnector implements Connector {
                 if (this.wasHelloReceived && this.wasSubcribeOkReceived) { this.onConnectionComplete() }
             } else if (command.startsWith("TALLY OK")) {
                 this.handleTallyCommand(command)
-            } else if (command.startsWith("XML ")) {
-                // @TODO: it would be better to detect the "XML" response itself, not the payload
-            } else if (command.startsWith("<vmix>")) {  
+            } else if (command.startsWith("<vmix>")) {
                 this.handleXmlCommand(command)
             } else {
                 console.debug("Ignoring unkown command from vmix")
             }
-        }, this)
+        }
     }
     private handleTallyCommand(command: string) {
         const result = command.match(/^TALLY OK (\d*)$/)
@@ -158,21 +209,20 @@ class VmixConnector implements Connector {
             if (error) {
                 console.error(`Error parsing XML response from vMix: ${error}`)
             } else {
-                const inputs = (result.vmix || {}).inputs
+                const vmix = result.vmix || {}
+                const inputs = vmix.inputs
                 if(inputs === undefined) {
                     console.log("XML from vMix looks faulty. Could not find inputs.")
                 } else {
-                    const count = inputs[0].input.length
-                    const names = inputs[0].input.reduce((map, input, idx) => {
-                        map[idx+1] = input.$.shortTitle
-                        return map
-                    }, {})
-                    this.communicator.notifyChannelNames(count, names)
+                    const channels = inputs[0].input.map(input => new Channel(input.$.number, input.$.shortTitle))
+                    this.communicator.notifyChannels(channels)
+                    this.communicator.notifyVmixProject(vmix.preset && vmix.preset[0])
                 }
             }
         })
     }
     disconnect() {
+        this.disconnectRequested = true
         this.wasHelloReceived = false
         this.wasSubcribeOkReceived = false
         const promise = new Promise(resolve => {
@@ -188,24 +238,14 @@ class VmixConnector implements Connector {
                 clearTimeout(this.waitForHelloTimeout)
                 this.waitForHelloTimeout = undefined;
             }
-            if (this.client && ! this.client.destroyed) {
-                // @TODO: check if client is still connected and disconnect gracefully
-                // if (this.client.isConnected) {
-                //     // if we are connected: try to be nice
-                //     this.client.end(() => {
-                //         console.log("Disconnected from vMix")
-                //         resolve(null)
-                //     })
-                // } else {
-                // if not: be rude
-                this.client.destroy()
-                resolve(null)
-                // }
+            const client = this.client
+            this.client = undefined
+            if (client && !client.destroyed) {
+                client.end(() => resolve(null))
             } else {
                 resolve(null)
             }
         })
-        this.client = undefined
         return promise
     }
     isConnected() {
@@ -213,6 +253,12 @@ class VmixConnector implements Connector {
     }
     
     static readonly ID: "vmix" = "vmix"
+    static readonly reconnectInterval = 3000
+    static readonly reconnectLimit = 10 * 60 * 1000
+
+    static hasReachedReconnectLimit(startedAt: number) {
+        return Date.now() - startedAt >= VmixConnector.reconnectLimit
+    }
 }
 
 export default VmixConnector

@@ -6,6 +6,7 @@ import UdpTallyDriver from './tally/UdpTallyDriver'
 import { AppConfiguration } from './lib/AppConfiguration'
 import { MixerDriver } from './lib/MixerDriver'
 import express from 'express'
+import path from 'path'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import { Server } from 'http'
 import socketIo from 'socket.io'
@@ -25,6 +26,7 @@ import TestConfiguration from './mixer/test/TestConfiguration'
 import WebTallyDriver from './tally/WebTallyDriver'
 import { DefaultTallyConfiguration, TallyConfiguration } from './tally/TallyConfiguration'
 import NodeMcuConnector from './flasher/NodeMcuConnector'
+import VmixProjectManager from './lib/VmixProjectManager'
 
 const argv = yargs.argv
 if (argv.env !== undefined) {
@@ -56,6 +58,7 @@ new UdpTallyDriver(myConfiguration, myTallyContainer)
 const myWebTallyDriver = new WebTallyDriver(myConfiguration, myTallyContainer)
 
 const myMixerDriver = new MixerDriver(myConfiguration, myEmitter)
+const myVmixProjectManager = new VmixProjectManager(myConfiguration, myTallyContainer, myEmitter)
 
 const myNodeMcuConnector = new NodeMcuConnector()
 
@@ -176,8 +179,8 @@ io.on('connection', (socket: ServerSideSocket) => {
     tallyEvents.forEach(pipe => pipe.unregister())
   })
   
-  socket.on('tally.patch', (tallyName, tallyType, channelId) => {
-    myTallyContainer.patch(tallyName, tallyType, channelId)
+  socket.on('tally.patch', (tallyName, tallyType, channelIds) => {
+    myTallyContainer.patch(tallyName, tallyType, channelIds)
   })
   socket.on('tally.highlight', (tallyName, tallyType) => {
     myTallyContainer.highlight(tallyName, tallyType)
@@ -185,8 +188,8 @@ io.on('connection', (socket: ServerSideSocket) => {
   socket.on('tally.remove', (tallyName, tallyType) => {
     myTallyContainer.remove(tallyName, tallyType)
   })
-  socket.on('tally.create', (tallyName, channelId) => {
-    myWebTallyDriver.create(tallyName, channelId)
+  socket.on('tally.create', (tallyName, channelIds) => {
+    myWebTallyDriver.create(tallyName, channelIds)
   })
   socket.on('tally.settings', (tallyName, tallyType, settings) => {
     const configuration = new TallyConfiguration()
@@ -231,6 +234,22 @@ io.on('connection', (socket: ServerSideSocket) => {
   socket.on('events.channel.unsubscribe', () => {
     // @TODO: not used yet
     channelEvents.forEach(pipe => pipe.unregister())
+  })
+
+  const vmixProjectEvents = [
+    new SocketAwareEvent(myEmitter, 'vmix.project.state.changed', socket, (socket, state) => {
+      socket.emit('vmix.project.state', state)
+    }),
+  ]
+  socket.on('events.vmixProject.subscribe', () => {
+    vmixProjectEvents.forEach(pipe => pipe.register())
+    socket.emit('vmix.project.state', myVmixProjectManager.getState())
+  })
+  socket.on('events.vmixProject.unsubscribe', () => {
+    vmixProjectEvents.forEach(pipe => pipe.unregister())
+  })
+  socket.on('vmix.project.save', () => {
+    myVmixProjectManager.saveCurrentProject()
   })
 
 
@@ -351,11 +370,14 @@ if (myConfiguration.isDev()) {
 } else {
   const publicDirName = "frontend"
   console.info(`Serving frontend from directory ${publicDirName}`)
-  app.use('/', express.static(`${__dirname}/${publicDirName}/`))
+  const frontendDir = (process as NodeJS.Process & { pkg?: unknown }).pkg
+    ? path.join(path.dirname(process.execPath), publicDirName)
+    : path.join(__dirname, publicDirName)
+  app.use('/', express.static(frontendDir))
 
   // fetch all route to allow deep-links into the application
   app.get('*', function(req, res) {
-    res.sendFile(`${__dirname}/${publicDirName}/index.html`)
+    res.sendFile(path.join(frontendDir, 'index.html'))
   })
 }
 

@@ -15,12 +15,14 @@ export type TallySaveObjectType = {
     name: string
     type?: TallyType
     channelId?: string
+    channelIds?: string[]
 } & TallyConfigurationObjectType
 
 export type TallyObjectType = {
     name: string
     type: TallyType
     channelId?: string
+    channelIds?: string[]
 } & TallyConfigurationObjectType
 
 export interface UdpTallyObjectType extends TallyObjectType {
@@ -37,20 +39,26 @@ export type TallyType = "udp" | "web"
 
 export abstract class Tally {
     name: string
-    channelId?: string
+    channelIds: string[]
     highlight: boolean = false
     logs: Log[] = []
     readonly type: TallyType
     configuration: TallyConfiguration
     hasStageLight: boolean = true
 
-    constructor(name: string, channelId?: string) {
+    constructor(name: string, channelIds: string|string[] = []) {
         this.name = name
-        this.channelId = channelId
+        this.channelIds = typeof channelIds === "string" ? [channelIds] : channelIds
         this.configuration = new TallyConfiguration()
     }
+    get channelId() : string|undefined {
+        return this.channelIds[0]
+    }
+    set channelId(channelId: string|undefined) {
+        this.channelIds = channelId === undefined ? [] : [channelId]
+    }
     isPatched() : boolean {
-        return this.channelId !== undefined
+        return this.channelIds.length > 0
     }
     abstract isConnected() : boolean
     abstract isDisconnected() : boolean
@@ -85,9 +93,8 @@ export abstract class Tally {
 
     isIn(channelNames: string[] = []) : boolean {
         if (channelNames === null) return false
-        if (this.channelId === undefined) return false
 
-        return channelNames.indexOf(this.channelId) !== -1
+        return this.channelIds.some(channelId => channelNames.indexOf(channelId) !== -1)
     }
 
     setConfiguration(conf: TallyConfiguration) {
@@ -98,16 +105,17 @@ export abstract class Tally {
         return {
             name: this.name,
             type: this.type,
-            channelId: this.channelId,
+            channelIds: this.channelIds,
             ...this.configuration.toJson(),
         }
     }
 
     static fromJsonForSave(valueObject: TallySaveObjectType) : UdpTally | WebTally {
+        const channelIds = valueObject.channelIds || (valueObject.channelId ? [valueObject.channelId] : [])
         const tally = valueObject.type === "web" ?
-            new WebTally(valueObject.name, valueObject.channelId):
+            new WebTally(valueObject.name, channelIds):
             // UdpTally was the previous default. So if no type is set we also expect an Udp Tally
-            new UdpTally(valueObject.name, valueObject.channelId)
+            new UdpTally(valueObject.name, channelIds)
 
         const configuration = new TallyConfiguration()
         configuration.fromJson(valueObject)
@@ -120,7 +128,7 @@ export abstract class Tally {
         return {
             name: this.name,
             type: this.type,
-            channelId: this.channelId,
+            channelIds: this.channelIds,
             ...this.configuration.toJson(),
         }
     }
@@ -139,8 +147,8 @@ export class UdpTally extends Tally {
     state: ConnectionState
     readonly type = "udp"
 
-    constructor(name: string, channelId?: string, address?: string, port?: number, state: ConnectionState = ConnectionState.DISCONNECTED) {
-        super(name, channelId)
+    constructor(name: string, channelIds: string|string[] = [], address?: string, port?: number, state: ConnectionState = ConnectionState.DISCONNECTED) {
+        super(name, channelIds)
         this.address = address
         this.port = port
         this.state = state
@@ -170,7 +178,7 @@ export class UdpTally extends Tally {
     static fromJson(valueObject: UdpTallyObjectType) {
         const tally = new UdpTally(
             valueObject.name,
-            valueObject.channelId,
+            valueObject.channelIds || (valueObject.channelId ? [valueObject.channelId] : []),
             valueObject.address,
             valueObject.port,
             valueObject.state
@@ -185,8 +193,8 @@ export class WebTally extends Tally {
     readonly type = "web"
     connectedClients: ClientAddress[]
 
-    constructor(name: string, channelId?: string, connectedClients?: ClientAddress[]) {
-        super(name, channelId)
+    constructor(name: string, channelIds: string|string[] = [], connectedClients?: ClientAddress[]) {
+        super(name, channelIds)
 
         this.connectedClients = connectedClients || []
         this.hasStageLight = false
@@ -215,7 +223,7 @@ export class WebTally extends Tally {
     static fromJson(valueObject: WebTallyObjectType) {
         const tally = new WebTally(
             valueObject.name,
-            valueObject.channelId,
+            valueObject.channelIds || (valueObject.channelId ? [valueObject.channelId] : []),
             valueObject.connectedClients
         )
         tally.configuration.fromJson(valueObject)

@@ -1,4 +1,3 @@
-import nodemcuLib from 'nodemcu-tool'
 import TallyDevice from './TallyDevice'
 import TallySettingsIni from './TallySettingsIni'
 import tmp from 'tmp-promise'
@@ -64,11 +63,23 @@ class NodeMcuConnector {
   }
 
   // injectable for easier testing
-  constructor(nodemcu: any = nodemcuLib) {
-    this.nodemcu = nodemcu
-    this.nodemcu.onError((error:any) => {
-      console.error(error)
-    })
+  constructor(nodemcu?: any) {
+    if (nodemcu) {
+      this.nodemcu = nodemcu
+    } else {
+      try {
+        const nodemcuModuleName = ['nodemcu', '-tool'].join('')
+        this.nodemcu = process.mainModule?.require(nodemcuModuleName)
+      } catch (error) {
+        console.error(`Could not load the NodeMCU tool: ${error}`)
+        this.nodemcu = undefined
+      }
+    }
+    if (this.nodemcu) {
+      this.nodemcu.onError((error:any) => {
+        console.error(error)
+      })
+    }
   }
 
   private static async getLocalFiles() {

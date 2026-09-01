@@ -15,34 +15,34 @@ const useStyles = makeStyles(theme => ({
 
 type ChannelSelectorProps = {
     channels?: Channel[]
-    value?: string
-    onChange?: (value: string|null) => void
+    value?: string|string[]
+    onChange?: (value: string[]) => void
 }
 
-const ChannelSelector = ({channels, value = null, onChange} : ChannelSelectorProps) => {
+const ChannelSelector = ({channels, value = [], onChange} : ChannelSelectorProps) => {
     channels = channels || []
     const classes = useStyles()
+    const values = typeof value === "string" ? [value] : value
 
     const handleValueChange = (e) => {
-        let val = e.target.value.toString()
-        if (val === "") { val = null }
+        const selectedValues = Array.from(e.target.selectedOptions as HTMLCollectionOf<HTMLOptionElement>)
+            .map(option => option.value)
+            .filter(value => value !== "")
 
         if (onChange) {
-            onChange(val)
+            onChange(selectedValues)
         }
     }
 
-    let optionFound = value === null
+    const availableChannelIds = channels.map(channel => channel.id)
+    const missingChannelIds = values.filter(value => availableChannelIds.indexOf(value) === -1)
 
-    return (<Select data-testid="channel-selector" native autoWidth={true} className={classes.root} classes={{ select: classes.select }} value={value || ""} onChange={handleValueChange}>
+    return (<Select data-testid="channel-selector" native multiple autoWidth={true} className={classes.root} classes={{ select: classes.select }} inputProps={{ size: 15 }} value={values} onChange={handleValueChange}>
         <option value="" key={null}>(unpatched)</option>
         {channels.map(c => {
-            if (c.id === value) {
-                optionFound = true
-            }
-            return <option key={c.id} value={c.id}>{c.name || `Channel ${c.id}`}</option>
+            return <option key={c.id} value={c.id}>{`${c.id} ${c.name || `Channel ${c.id}`}`}</option>
         })}
-        { !optionFound && value !== undefined ? (<option key={value} value={value}>Channel {value}</option>) : "" }
+        {missingChannelIds.map(channelId => <option key={channelId} value={channelId}>{channelId} Channel {channelId}</option>)}
     </Select>)
 }
 

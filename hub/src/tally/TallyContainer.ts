@@ -1,5 +1,5 @@
 import Log from "../domain/Log"
-import Tally, { TallyType, UdpTally, WebTally } from "../domain/Tally"
+import Tally, { TallySaveObjectType, TallyType, UdpTally, WebTally } from "../domain/Tally"
 import { AppConfiguration } from "../lib/AppConfiguration"
 import { ChannelList } from "../lib/MixerCommunicator"
 import ServerEventEmitter from "../lib/ServerEventEmitter"
@@ -138,15 +138,46 @@ class TallyContainer {
     }
   }
 
-  patch(tallyName: string, tallyType: TallyType, channelId: string|null) {
+    patch(tallyName: string, tallyType: TallyType, channelIds: string|string[]|null) {
       const tally = this.get(tallyName, tallyType)
       if (tally) {
-          tally.channelId = channelId ? channelId : undefined
+        tally.channelIds = Array.isArray(channelIds) ? channelIds : (channelIds ? [channelIds] : [])
           this.setAndAnnounceTally(tally)
-          console.debug(`Tally "${tally.name}" patched to "${channelId}"`)
+        console.debug(`Tally "${tally.name}" patched to "${tally.channelIds.join(', ')}"`)
       } else {
           console.warn(`Can not patch unknown tally named "${tallyName}"`)
       }
+  }
+
+  clearChannelAssignments() {
+    this.tallies.forEach(tally => {
+      tally.channelIds = []
+      this.updateTallyState(tally)
+    })
+    this.configuration.setTallies(this.getTallies())
+    this.emitter.emit('tally.changed', undefined)
+  }
+
+  applyProjectTallies(tallyProfiles: TallySaveObjectType[]) {
+    const savedTallies = tallyProfiles.map(tally => Tally.fromJsonForSave(tally))
+    const savedTalliesById = new Map(savedTallies.map(tally => [tally.getId(), tally]))
+
+    this.tallies.forEach(tally => {
+      const savedTally = savedTalliesById.get(tally.getId())
+      tally.channelIds = savedTally ? [...savedTally.channelIds] : []
+      if (savedTally) {
+        tally.setConfiguration(savedTally.configuration)
+      }
+      this.updateTallyState(tally)
+    })
+    savedTallies.forEach(tally => {
+      if (!this.tallies.has(tally.getId())) {
+        this.set(tally)
+        this.updateTallyState(tally)
+      }
+    })
+    this.configuration.setTallies(this.getTallies())
+    this.emitter.emit('tally.changed', undefined)
   }
 
   addLog(tallyName: string, tallyType: TallyType, log: Log) {

@@ -9,7 +9,7 @@ import RolandV60HDConfiguration from '../mixer/rolandV60HD/RolandV60HDConfigurat
 import VmixConfiguration from '../mixer/vmix/VmixConfiguration'
 import NullConfiguration from '../mixer/null/NullConfiguration'
 import { Configuration } from '../mixer/interfaces'
-import Tally from '../domain/Tally'
+import Tally, { TallySaveObjectType } from '../domain/Tally'
 import TestConfiguration from '../mixer/test/TestConfiguration'
 import { DefaultTallyConfiguration } from '../tally/TallyConfiguration'
 
@@ -24,6 +24,7 @@ export class AppConfiguration extends Configuration {
     testConfiguration: TestConfiguration
     vmixConfiguration: VmixConfiguration
     tallyConfiguration: DefaultTallyConfiguration
+    vmixProjectProfiles: Record<string, { presetPath: string, savedAt: string, tallies: TallySaveObjectType[] }>
     tallies: Tally[]
     channels: Channel[]
     mixerSelection?: string
@@ -45,6 +46,7 @@ export class AppConfiguration extends Configuration {
         this.testConfiguration = new TestConfiguration()
         this.vmixConfiguration = new VmixConfiguration()
         this.tallyConfiguration = new DefaultTallyConfiguration()
+        this.vmixProjectProfiles = {}
         this.tallies = []
         this.channels = MixerDriver.defaultChannels
 
@@ -89,6 +91,13 @@ export class AppConfiguration extends Configuration {
         }
     }
 
+    protected loadVmixProjectProfiles(data: object) {
+        const profiles = data['vmixProjects']
+        if (typeof profiles === 'object' && profiles !== null && !Array.isArray(profiles)) {
+            this.vmixProjectProfiles = profiles as Record<string, { presetPath: string, savedAt: string, tallies: TallySaveObjectType[] }>
+        }
+    }
+
     fromJson(data: any): void {
         if (data.atem) {
             this.atemConfiguration.fromJson(data.atem)
@@ -120,6 +129,7 @@ export class AppConfiguration extends Configuration {
         this.loadString("mixer", this.setMixerSelection.bind(this), data)
         this.loadChannelArray("channels", this.setChannels.bind(this), data)
         this.loadTallyArray("tallies", this.setTallies.bind(this), data)
+        this.loadVmixProjectProfiles(data)
     }
     toJson(): object {
         return {
@@ -135,6 +145,7 @@ export class AppConfiguration extends Configuration {
             tallyDefaults: this.tallyConfiguration.toJson(),
             tallies: this.tallies.map(tally => tally.toJsonForSave()),
             channels: this.channels.map(channel => channel.toJson()),
+            vmixProjects: this.vmixProjectProfiles,
         }
     }
     clone(): AppConfiguration {
@@ -253,6 +264,23 @@ export class AppConfiguration extends Configuration {
     }
     getTallies() {
         return this.tallies
+    }
+
+    getVmixProjectProfile(presetPath: string) {
+        return this.vmixProjectProfiles[presetPath.toLowerCase()]
+    }
+
+    hasVmixProjectProfile(presetPath: string) {
+        return this.getVmixProjectProfile(presetPath) !== undefined
+    }
+
+    setVmixProjectProfile(presetPath: string, tallies: TallySaveObjectType[]) {
+        this.vmixProjectProfiles[presetPath.toLowerCase()] = {
+            presetPath,
+            savedAt: new Date().toISOString(),
+            tallies,
+        }
+        this.emitter.emit('config.changed', this)
     }
 
     setMixerSelection(mixerSelection: string) {

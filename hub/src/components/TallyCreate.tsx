@@ -32,8 +32,8 @@ const useStyles = makeStyles(theme => {
   }
 })
 
-const createTally = function (tallyName, channelId) {
-  socket.emit('tally.create', tallyName, channelId || undefined)
+const createTally = function (tallyName, channelIds) {
+  socket.emit('tally.create', tallyName, channelIds)
 }
 
 type TallyCreatePopupProps = {
@@ -47,7 +47,7 @@ const maxLength = 26 // same as "tally.name" in tally
 function TallyCreatePopup({classes, open, onClose}: TallyCreatePopupProps) {
   const channels = useChannels()
   const tallies = useTallies()
-  const [channelId, setChannelId] = useState<string>(undefined)
+  const [channelIds, setChannelIds] = useState<string[]>([])
   const [name, setName] = useState<string>("");
   const hasUdpTally = !!tallies?.find(tally => tally.isUdpTally())
   
@@ -61,8 +61,7 @@ function TallyCreatePopup({classes, open, onClose}: TallyCreatePopupProps) {
   }
 
   function handleCreate() {
-    console.log(channelId)
-    createTally(name, channelId)
+    createTally(name, channelIds)
     onClose()
   }
 
@@ -87,7 +86,7 @@ function TallyCreatePopup({classes, open, onClose}: TallyCreatePopupProps) {
             onChange={(e) => setName(e.target.value)}
             autoFocus={true}
           />
-          <ChannelSelector value={channelId} channels={channels} onChange={setChannelId} />
+          <ChannelSelector value={channelIds} channels={channels} onChange={setChannelIds} />
         </div>
         
         <DialogActions>

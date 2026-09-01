@@ -158,6 +158,19 @@ describe('Tally display', () => {
     }
 
     const name = randomTallyName()
+
+  it('activates for any of multiple patched channels', () => {
+    const name = randomTallyName()
+    cy.task('tally', name)
+    socket.emit('tally.patch', name, "udp", ["1", "3"])
+
+    const config = new TestConfiguration()
+    config.setPrograms(["3"])
+    config.setPreviews(["2"])
+    socket.emit("config.change.test", config, "test")
+
+    cy.getTestId(`tally-${name}`).should('have.attr', 'data-color', 'program')
+  })
     cy.task('tally', name)
     cy.getTestId(`tally-${name}`).contains(name).then(() => {
       socket.emit('tally.patch', name, "udp", "1")

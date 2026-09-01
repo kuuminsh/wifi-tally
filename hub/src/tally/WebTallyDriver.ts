@@ -46,10 +46,10 @@ class WebTallyDriver {
       this.container.update(tally)
     }
 
-    create(tallyName: string, channelId: string) {
+    create(tallyName: string, channelIds: string|string[] = []) {
       const tally = this.container.getOrCreate(tallyName, "web") as WebTally
       tally.name = tallyName
-      tally.channelId = channelId || undefined
+      tally.channelIds = Array.isArray(channelIds) ? channelIds : (channelIds ? [channelIds] : [])
       this.container.update(tally)
     }
     unsubscribe(tallyName: string, socket: ServerSideSocket) {

@@ -13,6 +13,7 @@ import { StateCommand } from "../tally/CommandCreator";
 import { TallyConfigurationObjectType } from "../tally/TallyConfiguration";
 import { TallyDeviceObjectType } from "../flasher/TallyDevice";
 import { TallyProgramProgressType, TallySettingsIniProgressType } from "../flasher/NodeMcuConnector";
+import { VmixProjectState } from "./VmixProjectManager";
 
 // events the server sends to the client
 export interface ServerSentEvents {
@@ -25,6 +26,7 @@ export interface ServerSentEvents {
     'mixer.state': (data: {isConnected: boolean}) => void
     'program.state': (data: {programs: ChannelList, previews: ChannelList}) => void
     'channel.state': (data: {channels: ChannelSaveObject[]}) => void
+    'vmix.project.state': (state: VmixProjectState) => void
 
     'config.state.atem': (atemConfiguration: AtemConfigurationSaveType) => void
     'config.state.mock': (mockConfiguration: MockConfigurationSaveType) => void
@@ -52,15 +54,17 @@ export interface ClientSentEvents {
     'events.tally.unsubscribe': () => void
     'events.channel.subscribe': () => void
     'events.channel.unsubscribe': () => void
+    'events.vmixProject.subscribe': () => void
+    'events.vmixProject.unsubscribe': () => void
     'events.tallyLog.subscribe': () => void
     'events.tallyLog.unsubscribe': () => void
     'events.webTally.subscribe': (tallyName: string) =>  void
     'events.webTally.unsubscribe': (tallyName: string) =>  void
 
-    'tally.patch': (tallyName: string, tallyType: TallyType, channelId: string|null) => void
+    'tally.patch': (tallyName: string, tallyType: TallyType, channelIds: string|string[]|null) => void
     'tally.highlight': (tallyName: string, tallyType: TallyType) => void
     'tally.remove': (tallyName: string, tallyType: TallyType) => void
-    'tally.create': (tallyName: string, channelId?: string) => void
+    'tally.create': (tallyName: string, channelIds?: string|string[]) => void
     'tally.settings': (tallyName: string, tallyType: TallyType, settings: TallyConfigurationObjectType) => void
 
     'config.change.atem': (atemConfiguration: AtemConfigurationSaveType, newMixer?: "atem") => void
@@ -72,6 +76,7 @@ export interface ClientSentEvents {
     'config.change.rolandV60HD': (rolandV60HDConfiguration: RolandV60HDConfigurationSaveType, newMixer?: "rolandV60HD") => void
     'config.change.vmix': (vmixConfiguration: VmixConfigurationSaveType, newMixer?: "vmix") => void
     'config.change.tallyconfig': (configuration: TallyConfigurationObjectType) => void
+    'vmix.project.save': () => void
 
     'flasher.device.get': () => void
     'flasher.settingsIni': (path: string, settingsIniString: string) => void

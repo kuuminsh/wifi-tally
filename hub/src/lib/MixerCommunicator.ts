@@ -20,6 +20,7 @@ export class MixerCommunicator {
     currentPrograms: ChannelList
     currentPreviews: ChannelList
     isConnected: boolean | null
+    currentVmixPreset?: string
     
     constructor(configuration: AppConfiguration, emitter: ServerEventEmitter) {
         this.configuration = configuration
@@ -28,6 +29,7 @@ export class MixerCommunicator {
         this.currentPrograms = null
         this.currentPreviews = null
         this.isConnected = null
+        this.currentVmixPreset = undefined
     }
 
     private changeProgramsIfNecessary(programs: ChannelList) {
@@ -93,6 +95,13 @@ export class MixerCommunicator {
         channels = channels || []
         if (JSON.stringify(channels.map(c => c.toJson())) !== JSON.stringify(this.configuration.getChannels().map(c => c.toJson()))) {
             this.configuration.setChannels(channels)
+        }
+    }
+
+    notifyVmixProject(presetPath?: string) {
+        if (this.currentVmixPreset !== presetPath) {
+            this.currentVmixPreset = presetPath
+            this.emitter.emit('vmix.project.changed', presetPath)
         }
     }
 

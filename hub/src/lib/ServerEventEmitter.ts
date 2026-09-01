@@ -13,6 +13,7 @@ import VmixConfiguration from "../mixer/vmix/VmixConfiguration";
 import { DefaultTallyConfiguration } from "../tally/TallyConfiguration";
 import { AppConfiguration } from "./AppConfiguration";
 import { ChannelList } from "./MixerCommunicator";
+import { VmixProjectState } from "./VmixProjectManager";
 
 /* events that are send around on the server */
 
@@ -32,6 +33,8 @@ export interface EventHandlersDataMap {
     'config.changed.mixer': (mixerName: string) => void
     'mixer.connected': () => void
     'mixer.disconnected': () => void
+    'vmix.project.changed': (presetPath?: string) => void
+    'vmix.project.state.changed': (state: VmixProjectState) => void
     'program.changed': (data: {programs: ChannelList, previews: ChannelList}) => void
     'tally.created': (t: Tally) => void
     'tally.changed': (t: Tally|undefined) => void

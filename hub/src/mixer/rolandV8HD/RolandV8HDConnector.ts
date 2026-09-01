@@ -1,4 +1,3 @@
-import midi from 'midi'
 import { MixerCommunicator } from '../../lib/MixerCommunicator'
 import { Connector } from '../interfaces'
 import RolandV8HDConfiguration from './RolandV8HDConfiguration'
@@ -20,12 +19,22 @@ class RolandV8HDConnector implements Connector {
         this.communicator = communicator
         this.connected = false
         this.interval = null
-        this.midi = midi
+        try {
+          const midiModuleName = ['mi', 'di'].join('')
+          this.midi = eval('require')(midiModuleName)
+        } catch (error) {
+          console.error(`Could not load the native MIDI module: ${error}`)
+          this.midi = undefined
+        }
         this.input_status = [0,0,0,0,0,0,0,0]
     }
 
     connect() {
         console.log(`Connecting to RolandV8HD V-8HD via MIDI`)
+      if (!this.midi) {
+        console.error("Roland V-8HD cannot connect because the native MIDI module is unavailable")
+        return
+      }
         this.midi_input = new this.midi.Input()
         let inputPortCount = this.midi_input.getPortCount()
         // select correct port
