@@ -28,6 +28,20 @@ uses icons from the Noun Project by
 * alternatively: turn any device with a browser (smartphone, tablet) into a Tally
 * Open Source / Open Hardware
 
+## Fork-Specific Changes
+
+This fork adds vMix-focused configuration and reliability improvements:
+
+* Assign multiple vMix Inputs to one Tally. Program takes priority over Preview when assigned Inputs have different states.
+* Browse 15 vMix Inputs at a time and see each Input number before its title.
+* Save independent Tally assignments and per-Tally settings for each vMix project. vTally detects the active project automatically and loads its saved profile; projects without a saved profile start with unpatched Tallies.
+* See the active vMix project name, configuration status, application version, and build time in the web interface. Use **Save project** to store the active project's configuration.
+* Process vMix TCP XML responses safely when they arrive in multiple network packets.
+* Exit the Hub if a complete vMix connection cannot be made within 10 minutes; the portable tray application exits with it.
+* Build standalone backend and portable Windows executables.
+
+See [Fork-Changes.md](Fork-Changes.md) for the complete technical description and compatibility details.
+
 ## Getting Started
 
 :arrow_forward: :arrow_forward: :arrow_forward: [Read the full documentation at wifi-tally.github.io](https://wifi-tally.github.io/) :arrow_backward: :arrow_backward: :arrow_backward:
